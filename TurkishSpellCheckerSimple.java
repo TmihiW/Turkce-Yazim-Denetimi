@@ -283,7 +283,8 @@ public class TurkishSpellCheckerSimple extends JFrame {
     }
     
     private void processAllFiles() {
-        for (int i = currentFileIndex; i < selectedFiles.size() && isRunning.get(); i++) {
+        final int totalFileCount = selectedFiles.size();
+        for (int i = currentFileIndex; i < totalFileCount && isRunning.get(); i++) {
             final int fileIndex = i; // Final variable for lambda
             currentFileIndex = i;
             File currentFile = selectedFiles.get(i);
@@ -340,6 +341,10 @@ public class TurkishSpellCheckerSimple extends JFrame {
                     outputArea.setText(finalContent);
                     outputArea.setCaretPosition(0); // Başa git
                 });
+                
+                // İlerleme çubuğunu güncelle
+                final int progress = (int) Math.round(((double) (i + 1) / totalFileCount) * 100);
+                SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
                 
                 // Dosya tamamlandı, bir sonraki dosyaya geç
                 currentIncorrectWordIndex = 0;
