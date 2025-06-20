@@ -19,6 +19,7 @@ import java.util.Collections;
 import zemberek.morphology.TurkishMorphology;
 import zemberek.normalization.TurkishSpellChecker;
 import zemberek.tokenization.TurkishTokenizer;
+import zemberek.tokenization.Token;
 
 public class TurkishSpellCheckerSimple extends JFrame {
     
@@ -168,7 +169,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
             // Zemberek'i başlat
             morphology = TurkishMorphology.createWithDefaults();
             spellChecker = new TurkishSpellChecker(morphology);
-            tokenizer = TurkishTokenizer.DEFAULT;
+            tokenizer = TurkishTokenizer.ALL;
             
             statusLabel.setText("Zemberek yuklendi - Hazir");
         } catch (Exception e) {
@@ -367,24 +368,23 @@ public class TurkishSpellCheckerSimple extends JFrame {
     private String processText(String inputText, String fileName, StringBuilder fileCorrectionsLog, int startFromIncorrectWordIndex) {
         
         // 1. Tüm metni kelimelere ve diğer karakterlere ayır (tokenization)
-        List<String> tokens = new ArrayList<>();
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\p{L}+)|([^\\p{L}]+)");
-        java.util.regex.Matcher matcher = pattern.matcher(inputText);
-        while (matcher.find()) {
-            tokens.add(matcher.group());
+        List<String> tokensAsString = new ArrayList<>();
+        List<Token> tokens = tokenizer.tokenize(inputText);
+        for (Token token : tokens) {
+            tokensAsString.add(token.getText());
         }
 
         // 2. Hatalı kelimelerin indekslerini bul
         List<Integer> incorrectTokenIndices = new ArrayList<>();
-        for (int i = 0; i < tokens.size(); i++) {
-            String token = tokens.get(i);
-            if (token.matches("\\p{L}+") && !spellChecker.check(token) && !eliminatedWords.contains(token)) {
+        for (int i = 0; i < tokensAsString.size(); i++) {
+            String token = tokensAsString.get(i);
+            if (tokens.get(i).getType() == Token.Type.Word && !spellChecker.check(token) && !eliminatedWords.contains(token)) {
                 incorrectTokenIndices.add(i);
             }
         }
 
         // 3. Düzeltme döngüsü
-        String[] correctedTokens = tokens.toArray(new String[0]);
+        String[] correctedTokens = tokensAsString.toArray(new String[0]);
         String[] lines = inputText.split("\\r?\\n");
 
         for (int i = startFromIncorrectWordIndex; i < incorrectTokenIndices.size(); i++) {
@@ -398,13 +398,18 @@ public class TurkishSpellCheckerSimple extends JFrame {
 
             currentIncorrectWordIndex = i;
             int tokenIndex = incorrectTokenIndices.get(i);
-            String wrongWord = tokens.get(tokenIndex);
+            String wrongWord = tokensAsString.get(tokenIndex);
+
+            // ANINDA KONTROL: Kelime döngü içinde elenmiş olabilir, tekrar kontrol et.
+            if (eliminatedWords.contains(wrongWord)) {
+                continue; // Bu kelimeyi atla ve döngüye devam et
+            }
 
             // Satır numarasını ve içeriğini bul
             int charCount = 0;
             int lineNumber = 1;
             for (int j = 0; j < tokenIndex; j++) {
-                for(char c : tokens.get(j).toCharArray()) {
+                for(char c : tokensAsString.get(j).toCharArray()) {
                     if (c == '\n') lineNumber++;
                 }
             }
@@ -420,7 +425,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
                     // Bir önceki hatalı kelimenin düzeltmesini geri al
                     if (i > 0) {
                         int prevIncorrectTokenIndex = incorrectTokenIndices.get(i-1);
-                        correctedTokens[prevIncorrectTokenIndex] = tokens.get(prevIncorrectTokenIndex);
+                        correctedTokens[prevIncorrectTokenIndex] = tokensAsString.get(prevIncorrectTokenIndex);
                     }
                     i = Math.max(-1, i - 2); // Döngü i++ yapacağı için -2
                     continue; // Döngünün başına dön
