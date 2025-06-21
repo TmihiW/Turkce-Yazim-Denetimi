@@ -1812,9 +1812,11 @@ public class TurkishSpellCheckerSimple extends JFrame {
     }
     
     private void showSettingsDialog() {
+        initializeSettings(); // Ayarları dosyadan yeniden yükleyerek her zaman taze veri göster
+
         JDialog dialog = new JDialog(this, "Ayarlar", true);
         dialog.setLayout(new BorderLayout(10, 10));
-        dialog.setSize(600, 500);
+        dialog.setSize(600, 400);
         dialog.setLocationRelativeTo(this);
 
         // Checkbox değişkenlerini final array'lerde tut (lambda expression için)
