@@ -124,6 +124,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
         calismalarimButton = new JButton("Calismalarim");
         startButton = new JButton("Yazim Denetimi Baslat");
         continueButton = new JButton("Devam Et");
+        continueButton.setEnabled(false);
         elenenlerButton = new JButton("Elenenler");
         kayitliKelimelerButton = new JButton("Kayitli Kelimeler");
         ayarlarButton = new JButton("Ayarlar");
@@ -578,20 +579,43 @@ public class TurkishSpellCheckerSimple extends JFrame {
     private void loadFile(int index) {
         if (index >= 0 && index < selectedFiles.size()) {
             currentFileIndex = index;
-            File file = selectedFiles.get(index);
-            
+            File listFile = selectedFiles.get(index); // This is the reference file from the list
+            File fileToLoad = null;
+
+            if (currentWorkspaceDir != null) {
+                File taranacakFile = new File(new File(currentWorkspaceDir, "Taranacak"), listFile.getName());
+                File tarandiFile = new File(new File(currentWorkspaceDir, "Tarandi"), listFile.getName());
+                
+                // Check Tarandi first, then Taranacak
+                if (tarandiFile.exists()) {
+                    fileToLoad = tarandiFile;
+                } else if (taranacakFile.exists()) {
+                    fileToLoad = taranacakFile;
+                }
+            } else {
+                // Normal mode, the file should be at the path specified in the list
+                fileToLoad = listFile;
+            }
+
+            if (fileToLoad == null || !fileToLoad.exists()) {
+                inputArea.setText("");
+                outputArea.setText("");
+                statusLabel.setText("Dosya bulunamadi: " + listFile.getName());
+                return;
+            }
+                
             try {
-                String content = new String(Files.readAllBytes(file.toPath()), "UTF-8");
+                String content = new String(Files.readAllBytes(fileToLoad.toPath()), "UTF-8");
                 inputArea.setText(content);
                 
                 // Düzeltilmiş dosyayı kontrol et ve yükle
                 String correctedFilePath;
                 if (currentWorkspaceDir != null) {
                     // Çalışma alanı aktifse, çalışma alanının Sonuc klasöründen yükle
-                    correctedFilePath = currentWorkspaceDir.getPath() + "/Sonuc/" + file.getName();
+                    correctedFilePath = currentWorkspaceDir.getPath() + "/Sonuc/" + listFile.getName();
                 } else {
                     // Normal modda global Sonuc klasöründen yükle
-                    correctedFilePath = "Sonuc/" + file.getName();
+                    correctedFilePath = "Sonuc/" + listFile.getName();
                 }
                 File correctedFile = new File(correctedFilePath);
                 if (correctedFile.exists()) {
@@ -603,7 +627,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
                 
                 fileList.setSelectedIndex(index);
                 fileList.ensureIndexIsVisible(index);
-                statusLabel.setText("Dosya yuklendi: " + file.getName() + " (" + (index + 1) + "/" + selectedFiles.size() + ")");
+                statusLabel.setText("Dosya yuklendi: " + fileToLoad.getName() + " (" + (index + 1) + "/" + selectedFiles.size() + ")");
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, 
                     "Dosya okunurken hata: " + e.getMessage(),
@@ -619,7 +643,36 @@ public class TurkishSpellCheckerSimple extends JFrame {
                 "Uyari", JOptionPane.WARNING_MESSAGE);
             return;
         }
+
+        String[] options = {"Tumunu Tara", "Seciliden Basla", "Iptal"};
+        String message = "Yazim denetimine nasil baslamak istersiniz?";
+        if (currentWorkspaceDir != null) {
+            message += "\n('Tarandi' klasorundeki dosyalar tekrar taranmak uzere geri tasinacaktir.)";
+        }
+
+        int choice = JOptionPane.showOptionDialog(this,
+                message,
+                "Denetimi Baslat",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]);
+
+        if (choice == 2 || choice == JOptionPane.CLOSED_OPTION) { // Cancel or closed
+            return;
+        }
+
+        int startIndex = 0;
+        if (choice == 1) { // "Seçiliden Başla"
+            startIndex = fileList.getSelectedIndex();
+            if (startIndex < 0) {
+                startIndex = 0; 
+            }
+        }
         
+        currentFileIndex = startIndex;
+
         isRunning.set(true);
         isPaused.set(false);
         correctionsLog.setLength(0);
@@ -638,11 +691,37 @@ public class TurkishSpellCheckerSimple extends JFrame {
         for (int i = currentFileIndex; i < totalFileCount && isRunning.get(); i++) {
             final int fileIndex = i; // Final variable for lambda
             currentFileIndex = i;
-            File currentFile = selectedFiles.get(i);
+            File listFile = selectedFiles.get(i);
+            File currentFile = listFile; // Default for normal mode
+
+            if (currentWorkspaceDir != null) {
+                File taranacakFile = new File(new File(currentWorkspaceDir, "Taranacak"), listFile.getName());
+                File tarandiFile = new File(new File(currentWorkspaceDir, "Tarandi"), listFile.getName());
+                
+                // If the file is in Tarandi, move it back to be re-scanned
+                if (tarandiFile.exists()) {
+                    try {
+                        Files.move(tarandiFile.toPath(), taranacakFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        final String errorMessage = "Dosya '" + tarandiFile.getName() + "' geri tasinirken hata: " + e.getMessage();
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(this, errorMessage, "Hata", JOptionPane.ERROR_MESSAGE);
+                        });
+                        continue; // Skip this file
+                    }
+                }
+                currentFile = taranacakFile; // The file to process is always in Taranacak
+            }
             
+            if (!currentFile.exists()) {
+                // This can happen if file was deleted externally.
+                continue; 
+            }
+            
+            final File finalCurrentFile = currentFile;
             SwingUtilities.invokeLater(() -> {
                 loadFile(fileIndex);
-                statusLabel.setText("Isleniyor: " + currentFile.getName() + " (" + (fileIndex + 1) + "/" + selectedFiles.size() + ")");
+                statusLabel.setText("Isleniyor: " + finalCurrentFile.getName() + " (" + (fileIndex + 1) + "/" + selectedFiles.size() + ")");
             });
             
             try {
@@ -1626,6 +1705,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
         try {
             File workspaceDir = new File("Calismalarim", workspaceName);
             File taranacakDir = new File(workspaceDir, "Taranacak");
+            File tarandiDir = new File(workspaceDir, "Tarandi");
             
             if (!taranacakDir.exists()) {
                 JOptionPane.showMessageDialog(this, 
@@ -1634,38 +1714,62 @@ public class TurkishSpellCheckerSimple extends JFrame {
                 return;
             }
             
-            // Taranacak klasöründeki dosyaları yükle
             selectedFiles.clear();
             fileListModel.clear();
-            
-            File[] files = taranacakDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".txt"));
-            if (files != null && files.length > 0) {
-                for (int i = 0; i < files.length; i++) {
-                    selectedFiles.add(files[i]);
-                    // Numaralı dosya listesi: "1. dosyaadi.txt"
-                    fileListModel.addElement((i + 1) + ". " + files[i].getName());
+
+            java.util.Set<String> fileNames = new java.util.LinkedHashSet<>();
+            // Add files from Taranacak
+            if (taranacakDir.exists()) {
+                File[] files = taranacakDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".txt"));
+                if (files != null) {
+                    for(File f : files) {
+                        fileNames.add(f.getName());
+                    }
                 }
-                
-                // Çalışma alanını aktif et
+            }
+            // Add files from Tarandi (without duplicates)
+            if (tarandiDir.exists()) {
+                File[] files = tarandiDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".txt"));
+                if (files != null) {
+                    for(File f : files) {
+                        fileNames.add(f.getName());
+                    }
+                }
+            }
+
+            int fileCounter = 0;
+            for (String fileName : fileNames) {
+                selectedFiles.add(new File(taranacakDir, fileName)); 
+                fileListModel.addElement((fileCounter + 1) + ". " + fileName);
+                fileCounter++;
+            }
+            
+            if (!fileNames.isEmpty()) {
                 currentWorkspaceName = workspaceName;
                 currentWorkspaceDir = workspaceDir;
                 
-                // İlk dosyayı yükle
                 if (!selectedFiles.isEmpty()) {
                     loadFile(0);
                 }
                 
                 statusLabel.setText(selectedFiles.size() + " dosya yuklendi (Calisma Alani: " + workspaceName + ")");
-                
-                // Sol panel başlığını güncelle
                 updateLeftPanelTitle();
                 
+                // Reset state for the new workspace
+                currentFileIndex = 0;
+                currentIncorrectWordIndex = 0;
+                pausedIncorrectWordIndex = 0;
+                isRunning.set(false);
+                isPaused.set(false);
+                startButton.setEnabled(true);
+                continueButton.setEnabled(false);
+
                 JOptionPane.showMessageDialog(this, 
                     "Calisma alani '" + workspaceName + "' basariyla acildi.", 
                     "Basarili", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this, 
-                    "Taranacak klasorunde dosya bulunamadi.", 
+                    "Calisma alaninda hic .txt dosyasi bulunamadi.", 
                     "Uyari", JOptionPane.WARNING_MESSAGE);
             }
             
