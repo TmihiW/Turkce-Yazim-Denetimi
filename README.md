@@ -2,7 +2,7 @@
 
 Bu uygulama, seçilen metin dosyalarındaki yazım hatalarını Zemberek NLP kütüphanesi kullanarak tespit etmenizi ve interaktif bir şekilde düzeltmenizi sağlar.
 
-![Uygulama Ekran Görüntüsü](https://i.imgur.com/p61lsmh.png)
+![Screenshot_19](https://github.com/user-attachments/assets/2f83437c-1449-472b-a812-cc907914ddc5)
 
 ## Gereksinimler
 
