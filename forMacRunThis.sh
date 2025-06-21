@@ -83,6 +83,7 @@ echo
 echo "Uygulama başlatılıyor..."
 echo
 
-java -cp ".:$ZEMBEREK_JARS" TurkishSpellCheckerSimple
-
-read -p "Devam etmek için Enter tuşuna basın..." 
+# nohup komutu, terminal kapansa bile uygulamanın çalışmaya devam etmesini sağlar.
+# '&' işareti işlemi arka plana atar ve betiğin sonlanmasına izin verir.
+# Çıktıları /dev/null'a yönlendirerek gereksiz dosya oluşumunu engelleriz.
+nohup java -cp ".:$ZEMBEREK_JARS" TurkishSpellCheckerSimple > /dev/null 2>&1 & 

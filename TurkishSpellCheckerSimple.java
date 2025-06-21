@@ -672,7 +672,7 @@ public class TurkishSpellCheckerSimple extends JFrame {
         }
         
         currentFileIndex = startIndex;
-
+        
         isRunning.set(true);
         isPaused.set(false);
         correctionsLog.setLength(0);

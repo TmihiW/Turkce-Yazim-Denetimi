@@ -65,6 +65,5 @@ echo.
 echo Uygulama başlatılıyor...
 echo.
 
-java -cp ".;%ZEMBEREK_JARS%" TurkishSpellCheckerSimple
-
-pause 
+rem javaw, konsol penceresi olmadan GUI uygulamalarını başlatır.
+start "TurkishSpellChecker" javaw -cp ".;%ZEMBEREK_JARS%" TurkishSpellCheckerSimple 
